@@ -9,3 +9,4 @@ python-docx
 moviepy
 imageio
 imageio-ffmpeg
+gunicorn
