@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Teacher Dashboard – EduLearn</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.upload-progress { display:none; margin-top:.8rem; background:#e3f2fd; border-radius:6px; padding:.7rem 1rem; font-size:.88rem; color:#1565c0; align-items:center; gap:.7rem; }
+.upload-progress.show { display:flex; }
+.spinner { width:18px; height:18px; border:3px solid #1565c0; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Clean teacher content card */
+.teacher-card { background:#fff; border-radius:10px; padding:1.2rem 1.5rem; margin-bottom:.8rem; box-shadow:0 1px 4px rgba(0,0,0,.07); display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.teacher-card-info { flex:1; min-width:0; }
+.teacher-card-info h3 { font-size:1rem; font-weight:600; color:#1a237e; margin-bottom:.3rem; }
+.teacher-card-meta { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; font-size:.82rem; color:#666; }
+.teacher-card-actions { display:flex; gap:.5rem; flex-shrink:0; }
+.status-dot { width:8px; height:8px; border-radius:50%; background:#2e7d32; display:inline-block; margin-right:.3rem; }
+.cat-badge { display:inline-block; padding:.15rem .55rem; border-radius:4px; font-size:.72rem; font-weight:600; background:#f3e5f5; color:#6a1b9a; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">📚 EduLearn</span>
+  <div>
+    <span style="opacity:.7;font-size:.9rem">👩‍🏫 {{ name }}</span>
+    <a href="/logout">Logout</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="flex-between" style="margin-bottom:1rem">
+    <h1 style="margin:0">Teacher Dashboard</h1>
+    <span class="badge badge-notes">{{ content|length }} items uploaded</span>
+  </div>
+
+  <!-- Upload Form -->
+  <div class="card">
+    <h2>📤 Upload Content</h2>
+    <p class="muted">PDF and PPT text is auto-extracted. Audio and video are auto-transcribed. All content is instantly accessible to all student types.</p>
+    {% if error %}
+
+<div class="alert alert-red" style="margin-bottom:1rem">
+
+  {{ error }}
+
+</div>
+
+{% endif %}
+    <form method="POST" action="/teacher/upload" enctype="multipart/form-data" onsubmit="showProgress()">
+      <div class="grid-2">
+        <div>
+          <label>Title</label>
+          <input name="title" required placeholder="e.g. Chapter 5 Notes">
+        </div>
+        <div>
+          <label>Content Type</label>
+          <select name="type" id="typeSelect">
+            <option value="notes">📝 Notes</option>
+            <option value="assignment">📋 Assignment</option>
+            <option value="audio">🎵 Audio Lecture</option>
+            <option value="video">🎬 Video Lesson</option>
+            <option value="pdf">📄 PDF Document</option>
+            <option value="ppt">📊 Presentation (PPT)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label>Assigned For (Disability Category)</label>
+        <select name="disability_category" required>
+          <option value="" selected disabled>Select Category</option>
+          <option value="all">All Students</option>
+          <option value="hearing">Hearing Impaired</option>
+          <option value="visual">Visually Impaired</option>
+          <option value="both">Deafblind</option>
+        </select>
+      </div>
+
+      <label>Content / Lesson Description (optional)</label>
+      <textarea name="text" rows="3" placeholder="Type lesson content here, or upload a file — text will be auto-extracted from PDF, PPT, audio and video files."></textarea>
+
+      <label>Upload File (PDF, audio, video, TXT, DOCX)</label>
+      <input type="file" name="file" accept=".pdf,.txt,.mp3,.wav,.mp4,.avi,.png,.jpg,.jpeg,.docx">
+
+      <label>Upload Sign Language Video (optional — for hearing impaired)</label>
+      <input type="file" name="sign_video" accept=".mp4,.avi,.mov">
+
+      <label>YouTube Video Link (for long videos)</label>
+      <input type="text" name="youtube_link" placeholder="Paste YouTube link here">
+
+      <div id="upload-progress" class="upload-progress">
+        <div class="spinner"></div>
+        <span id="progress-msg">Uploading and processing content…</span>
+      </div>
+
+      <div class="mt">
+        <button class="btn btn-blue" type="submit" id="upload-btn">Process & Upload</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Uploaded Content — clean cards only -->
+  <h2 style="margin-top:1.5rem;margin-bottom:.8rem">Uploaded Content</h2>
+
+  {% if not content %}
+    <div class="card muted">No content uploaded yet. Use the form above to add your first lesson.</div>
+  {% endif %}
+
+  {% for item in content %}
+  <div class="teacher-card">
+    <div class="teacher-card-info">
+      <h3>{{ item.title }}</h3>
+      <div class="teacher-card-meta">
+        <span class="badge badge-{{ item.type }}">{{ item.type }}</span>
+        {% if item.get('target', 'all') != 'all' %}
+          <span class="cat-badge">
+            {% if item.target == 'hearing' %}🦻 Hearing Impaired
+            {% elif item.target== 'visual' %}👁️ Visually Impaired
+            {% elif item.target== 'both' %}🤲 Deafblind
+            {% endif %}
+          </span>
+        {% else %}
+          <span class="cat-badge">👥 All Students</span>
+        {% endif %}
+        <span><span class="status-dot"></span>{{ item.status | capitalize }}</span>
+        {% if item.file %}<span>📎{{ item.file.split('_',1)[-1] if '_' in item.file else item.file }}</span>{% endif %}
+        {% if item.sign_video %}
+
+<div style="
+  margin-top:.45rem;
+  padding:.45rem .7rem;
+  background:#f3e5f5;
+  border-radius:6px;
+  font-size:.8rem;
+  color:#6a1b9a;
+">
+
+  🤟 <b>Sign Video:</b>
+  {{ item.sign_video }}
+
+</div>
+
+{% endif %}
+      </div>
+    </div>
+    <div class="teacher-card-actions">
+      <a href="/content/{{ item.id }}" class="btn btn-outline" style="font-size:.82rem;padding:.35rem .8rem">Open</a>
+      <a href="/teacher/delete/{{ item.id }}" class="btn btn-red"
+         onclick="return confirm('Delete this content?')">Delete</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+function showProgress() {
+  const type = document.getElementById('typeSelect').value;
+  const prog = document.getElementById('upload-progress');
+  const msg  = document.getElementById('progress-msg');
+  const btn  = document.getElementById('upload-btn');
+  const msgs = {
+    video: 'Uploading video and transcribing audio — this may take a moment…',
+    audio: 'Uploading audio and transcribing — this may take a moment…',
+    pdf:   'Uploading and extracting PDF text…',
+    ppt:   'Uploading and extracting PPT content…'
+  };
+  msg.textContent = msgs[type] || 'Uploading and processing content…';
+  prog.classList.add('show');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+}
+</script>
+</body>
+</html>

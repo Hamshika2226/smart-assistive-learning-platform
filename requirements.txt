@@ -1,0 +1,11 @@
+flask
+werkzeug
+edge-tts
+PyPDF2
+python-pptx
+openai-whisper
+pillow
+python-docx
+moviepy
+imageio
+imageio-ffmpeg

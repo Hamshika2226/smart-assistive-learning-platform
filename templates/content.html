@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title id="page-title">EduLearn</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body.both { background:#111; color:#fff; font-size:1.2rem; }
+body.both .card { background:#1e1e1e; border:2px solid #555; }
+body.both nav { background:#000; border-bottom:2px solid #444; }
+.content-body { line-height:1.9; font-size:1rem; white-space:pre-wrap; word-break:break-word; }
+body.visual .content-body { font-size:1.1rem; }
+body.both .content-body { font-size:1.15rem; }
+.section-box { background:#f9f9f9; border-radius:8px; padding:1rem 1.2rem; margin-top:.8rem; }
+body.both .section-box { background:#2a2a2a; }
+.braille-display { font-size:1.8rem; letter-spacing:.15rem; color:#6a1b9a; word-break:break-all; line-height:2.2; }
+body.both .braille-display { color:#ce93d8; }
+.summary-box { background:#fff8e1; border-left:4px solid #f9a825; border-radius:6px; padding:1rem 1.2rem; line-height:1.7; }
+body.both .summary-box { background:#2a2a2a; border-color:#f9a825; color:#ccc; }
+#tts-bar { background:#e8f5e9; border:1px solid #a5d6a7; border-radius:8px; padding:.7rem 1rem; margin-bottom:1rem; align-items:center; gap:.6rem; flex-wrap:wrap; display:none; }
+body.visual #tts-bar { display:flex; }
+.speed-btn { padding:.3rem .85rem; border-radius:20px; border:2px solid #2e7d32; background:transparent; color:#2e7d32; cursor:pointer; font-size:.84rem; font-weight:600; transition:.15s; }
+.speed-btn.active { background:#2e7d32; color:#fff; }
+#subtitle-box { display:none; background:#000; color:#fff; text-align:center; padding:.9rem 1.4rem; border-radius:6px; font-size:1.05rem; line-height:1.7; margin-top:.6rem; min-height:52px; border:2px solid #333; }
+#subtitle-box.active { display:block; }
+#voice-cmd-status { position:fixed; top:66px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.82); color:#fff; padding:.5rem 1.3rem; border-radius:20px; font-size:.88rem; z-index:400; white-space:nowrap; opacity:0; transition:opacity .3s; pointer-events:none; }
+#voice-fab { display:none; position:fixed; bottom:20px; right:20px; background:#2e7d32; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:1.5rem; cursor:pointer; z-index:300; box-shadow:0 4px 14px rgba(0,0,0,.3); align-items:center; justify-content:center; }
+body.visual #voice-fab { display:flex; }
+#voice-fab.listening { background:#c62828; animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,.4)} 50%{box-shadow:0 0 0 10px rgba(198,40,40,0)} }
+#sign-fab { position:fixed; right:20px; bottom:140px; background:#ff0000; color:#fff; border:none; border-radius:50%; width:60px; height:60px; font-size:24px; cursor:pointer; z-index:999; display:none; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+#sign-player { display:none; position:fixed; right:20px; bottom:210px; width:300px; background:#000; border-radius:10px; padding:1rem; box-shadow:0 6px 18px rgba(0,0,0,.3); z-index:300; }
+</style>
+</head>
+<body class="{{ disability }}">
+<nav>
+  <span class="brand">📚 EduLearn</span>
+  <div>
+    <a href="/student" style="margin-right:.5rem">← Back</a>
+    <a href="/logout">Logout</a>
+  </div>
+</nav>
+
+<div id="voice-cmd-status"></div>
+
+<div class="page">
+  <div class="flex" style="margin-bottom:.6rem;flex-wrap:wrap;gap:.4rem">
+    <span class="badge" id="item-type-badge"></span>
+    <h1 style="margin:0" id="item-title"></h1>
+  </div>
+  <p class="muted" style="margin-bottom:1rem" id="item-teacher"></p>
+
+  <!-- TTS bar (visual only via CSS) -->
+  <div id="tts-bar">
+    <span style="font-weight:600">🔊 Voice Assistant</span>
+    <button class="btn btn-green" onclick="readContent()">▶ Read</button>
+    <button class="btn btn-outline" onclick="stopSpeech()">⏹ Stop</button>
+    <button class="speed-btn" id="spd-slow"   onclick="setSpeed(0.6,'slow')">🐢 Slow</button>
+    <button class="speed-btn active" id="spd-normal" onclick="setSpeed(1.0,'normal')">▶ Normal</button>
+    <button class="speed-btn" id="spd-fast"   onclick="setSpeed(1.4,'fast')">⚡ Fast</button>
+    <span id="tts-status" style="font-size:.82rem;color:#2e7d32;margin-left:.3rem"></span>
+  </div>
+
+  <!-- Hearing notice -->
+  <div id="hearing-notice" style="display:none" class="alert alert-blue">
+    🦻 <b>Subtitles active for video.</b> Clean summary shown below.
+  </div>
+
+  <!-- Main content (hidden for video type) -->
+  {% if item.type != 'video' %}
+  <div class="card">
+    <h2>📄 Content</h2>
+    <div class="content-body" id="main-text"></div>
+  </div>
+  {% endif %}
+
+  <!-- Summary card -->
+  <div class="card" id="summary-card" style="display:none">
+    <h2>📋 Summary</h2>
+    <div class="summary-box" id="summary-text">
+      <span style="color:#aaa">Click Summarize to generate a smart summary.</span>
+    </div>
+    <div style="margin-top:.8rem;display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn btn-green" id="read-summary-btn" style="display:none" onclick="readSummary()">🔊 Read Summary</button>
+    </div>
+    <div id="summary-status" style="font-size:.82rem;color:#777;margin-top:.4rem"></div>
+  </div>
+
+  <!-- Subtitle box — hearing + video -->
+  {% if item.type == 'video' %}
+  <div id="subtitle-box">▶ Press play — subtitles will appear here</div>
+  {% endif %}
+
+  <!-- File/video rendering area -->
+  <div id="file-area" style="margin-top:1rem"></div>
+
+  <!-- YouTube embed -->
+  {% if item.youtube_link %}
+  <div class="card">
+    <h2>🎥 Video Lesson</h2>
+    {% if disability == 'hearing' %}
+    <div style="background:#e3f2fd;padding:10px;border-radius:8px;margin-bottom:10px;color:#0d47a1;font-weight:600">
+      🦻 Hearing Support Enabled — Turn ON YouTube CC subtitles.
+    </div>
+    {% endif %}
+    <iframe width="100%" height="450" src="{{ item.youtube_link }}" frameborder="0" allowfullscreen></iframe>
+  </div>
+
+  {% if disability == 'visual' %}
+  <div class="card">
+    <h2>🔊 Audio Learning Mode</h2>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn btn-green" onclick="readLesson()">▶ Listen to Lesson</button>
+      <button class="btn btn-outline" onclick="stopLessonAudio()">⏹ Stop Audio</button>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <!-- Audio download card (visual only) -->
+  <div class="card" id="audio-download-card" style="display:none">
+    <h2>🎵 Listen to Lesson</h2>
+    <p class="muted" style="margin-bottom:.8rem">Generate a spoken version of this lesson (natural female voice)</p>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="generateAudio(this,'slow')">🐢 Slow</button>
+      <button class="btn btn-green"   onclick="generateAudio(this,'normal')">🎵 Normal</button>
+      <button class="btn btn-outline" onclick="generateAudio(this,'fast')">⚡ Fast</button>
+    </div>
+    <div id="audio-wrap" style="margin-top:.8rem"></div>
+  </div>
+
+  <!-- Braille card (deafblind only) -->
+  <div class="card" id="braille-card" style="display:none">
+    <h2>⣿ Braille Output</h2>
+    <div class="braille-display" id="braille-text">⠝⠕ ⠃⠗⠁⠊⠇⠇⠑</div>
+    <p class="muted" style="margin-top:.7rem">Physical output via ESP32 solenoid Braille cell</p>
+    <div style="margin-top:.8rem;display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn btn-blue"    onclick="sendToESP32()">📡 Send to ESP32</button>
+      <button class="btn btn-outline" onclick="convertCustom()">✏ Convert Custom Text</button>
+    </div>
+    <div id="esp32-status" style="margin-top:.7rem;font-size:.85rem;color:#aaa"></div>
+  </div>
+
+  <div class="card" id="braille-cell-card" style="display:none">
+    <h2>🔧 Solenoid Pin Pattern Preview</h2>
+    <p class="muted" style="margin-bottom:.7rem">6-dot Braille cell state for first characters</p>
+    <div id="braille-cell" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    <div style="margin-top:.7rem;font-size:.82rem;color:#aaa">
+      ● = Pin HIGH (dot raised) &nbsp;|&nbsp; ○ = Pin LOW (dot flat)
+    </div>
+  </div>
+</div>
+
+<button id="voice-fab" onclick="toggleVoiceCommand()" title="Voice command">🎙️</button>
+
+<button id="sign-fab" onclick="toggleSignPlayer()">▶️</button>
+<div id="sign-player">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+    <strong style="color:white">Sign Language</strong>
+    <button onclick="toggleSignPlayer()" style="background:none;border:none;font-size:1.2rem;color:white;cursor:pointer">✖</button>
+  </div>
+  <iframe id="sign-iframe" width="100%" height="200" src="" frameborder="0"
+    allow="autoplay; encrypted-media" allowfullscreen></iframe>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   EduLearn Content Page — Mobile + Desktop Voice Engine v8.0
+   Full accessibility: visual (TTS+voice) | hearing (subtitle+voice)
+   Mobile: Android Chrome, Samsung Internet, mobile WebView
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. DATA ── */
+var SERVER_ITEM = (function(){
+  try{ var d={{ item|tojson|safe }}; return(d&&typeof d==='object')?d:{}; }catch(e){return{};}
+})();
+var ITEM={
+  title     :String(SERVER_ITEM.title      ||'').trim(),
+  teacher   :String(SERVER_ITEM.teacher    ||'').trim(),
+  type      :String(SERVER_ITEM.type       ||'').trim(),
+  text      :String(SERVER_ITEM.text       ||'').trim(),
+  transcript:String(SERVER_ITEM.transcript ||'').trim(),
+  summary   :String(SERVER_ITEM.summary    ||'').trim(),
+  file      :String(SERVER_ITEM.file       ||'').trim(),
+  sign_video:String(SERVER_ITEM.sign_video ||'').trim(),
+  braille   :String(SERVER_ITEM.braille    ||'').trim(),
+  youtube   :String(SERVER_ITEM.youtube_link||'').trim()
+};
+
+/* ── 2. DISABILITY + LESSON MODE ── */
+var DISABILITY=(function(){
+  try{
+    var c=['visual','hearing','both']
+      .find(function(x){return document.body.classList.contains(x);});
+    return c||'none';
+  }catch(e){return'none';}
+})();
+
+var LESSON_MODE=(function(){
+  var f=ITEM.file.toLowerCase();
+  if(f.match(/\.(mp4|avi|mov)$/)) return'video';
+  if(f.match(/\.(mp3|wav)$/))     return'audio';
+  if(ITEM.youtube)                return'youtube';
+  return'text';
+})();
+
+var speechRate=1.0;
+
+/* ── 3. MOBILE DETECTION ── */
+var IS_MOBILE=(function(){
+  return/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Samsung/i
+    .test(navigator.userAgent);
+})();
+
+/* ── 4. DOM HELPERS ── */
+var DOM={
+  get:function(id){try{return document.getElementById(id)||null;}catch(e){return null;}},
+  text:function(id,v){var e=this.get(id);if(e)e.textContent=String(v!=null?v:'');},
+  html:function(id,v){var e=this.get(id);if(e)e.innerHTML=String(v!=null?v:'');},
+  show:function(id,d){var e=this.get(id);if(e)e.style.display=d||'block';},
+  hide:function(id){var e=this.get(id);if(e)e.style.display='none';},
+  addClass:function(id,cls){var e=this.get(id);if(e&&cls)e.classList.add(cls);},
+  removeClass:function(id,cls){var e=this.get(id);if(e&&cls)e.classList.remove(cls);},
+  query:function(sel){try{return document.querySelector(sel)||null;}catch(e){return null;}},
+  queryAll:function(sel){
+    try{return Array.prototype.slice.call(document.querySelectorAll(sel));}
+    catch(e){return[];}
+  }
+};
+
+/* ── 5. GLOBAL STATE ── */
+var STATE={
+  ttsActive    :false,
+  mediaPlaying :false,
+  micActive    :false,
+  noiseWindow  :false,
+  noiseTimer   :null,
+  lastCmd      :'',
+  lastCmdTime  :0,
+  suspended    :false,
+  /* open suppression window when media starts — prevents mic picking up video */
+  openNoiseWindow:function(){
+    this.noiseWindow=true;
+    clearTimeout(this.noiseTimer);
+    var self=this;
+    this.noiseTimer=setTimeout(function(){self.noiseWindow=false;},3000);
+  },
+  canAccept:function(){
+    return !this.ttsActive && !this.noiseWindow && !this.suspended;
+  }
+};
+
+/* ── 6. UI CONTROLLER ── */
+var UI=(function(){
+  var _bt=null;
+  function setBar(msg,listening){
+    var dot=DOM.get('hearing-mic-dot'),text=DOM.get('hearing-cmd-text');
+    if(dot){listening?dot.classList.add('listening'):dot.classList.remove('listening');}
+    if(text)text.textContent=msg;
+  }
+  function setSub(msg){var s=DOM.get('subtitle-box');if(s)s.textContent=msg||'…';}
+  function bubble(msg,ms){
+    var el=DOM.get('voice-cmd-status');if(!el)return;
+    el.textContent=msg;el.style.opacity='1';
+    clearTimeout(_bt);
+    _bt=setTimeout(function(){try{el.style.opacity='0';}catch(e){}},ms||3000);
+  }
+  function setStatus(msg){DOM.text('tts-status',msg);}
+  function hint(){
+    var h=(LESSON_MODE==='video'||LESSON_MODE==='audio'||LESSON_MODE==='youtube')
+      ?'🎙 Say: play  pause  slow  fast  rewind  forward  read summary  back'
+      :'🎙 Say: read content  read summary  stop  back';
+    if(DISABILITY==='hearing')setBar(h,false);
+    if(DISABILITY==='visual')bubble(h,5000);
+  }
+  return{setBar:setBar,setSub:setSub,bubble:bubble,setStatus:setStatus,hint:hint};
+})();
+
+/* ── 7. NOISE GUARD ── */
+var NoiseGuard=(function(){
+  var CMDS=[
+    'play','pause','stop','resume','continue','unpause',
+    'rewind','forward','skip','backward',
+    'slow','fast','normal','speed','medium',
+    'mute','unmute','louder','quieter','volume',
+    'back','home','dashboard','return',
+    'read','content','summary','summarize','transcript','lesson',
+    'help','logout','scroll','up','down','repeat','again'
+  ];
+  var NUMS=['one','two','three','four','five','six','seven','eight','nine','ten',
+            'first','second','third','fourth','fifth'];
+
+  function extractBest(event){
+    var best='',conf=-1;
+    try{
+      for(var ri=0;ri<event.results.length;ri++){
+        var res=event.results[ri];
+        for(var ai=0;ai<res.length;ai++){
+          var alt=res[ai];
+          var t=String(alt.transcript||'').trim();
+          if(!t)continue;
+          var c=(typeof alt.confidence==='number'&&alt.confidence>=0)?alt.confidence:0.5;
+          if(c>conf||(c===conf&&t.length>best.length)){best=t;conf=c;}
+        }
+      }
+    }catch(e){}
+    return{text:best,confidence:conf};
+  }
+
+  function normalise(raw){
+    return String(raw||'').toLowerCase()
+      .replace(/[^\w\s]/g,'').replace(/\s+/g,' ').trim();
+  }
+
+  function isValid(cmd){
+    if(!cmd||cmd.length<2)return false;
+    if(/\d/.test(cmd))return true;
+    var words=cmd.split(' ');
+    for(var i=0;i<words.length;i++){
+      if(CMDS.indexOf(words[i])!==-1)return true;
+      if(NUMS.indexOf(words[i])!==-1)return true;
+    }
+    return false;
+  }
+
+  function process(event){
+    var r=extractBest(event);
+    if(!r.text)return null;
+    /* Mobile Chrome often returns confidence=0 — allow it through */
+    if(r.confidence>0&&r.confidence<0.30)return null;
+    var cmd=normalise(r.text);
+    if(!cmd||cmd.length<2)return null;
+    if(!isValid(cmd))return null;
+    /* Reject long phrases while media plays — likely narration not command */
+    if(STATE.mediaPlaying&&cmd.split(' ').length>5)return null;
+    return cmd;
+  }
+
+  return{process:process,normalise:normalise};
+})();
+
+/* ── 8. MEDIA CONTROLLER ── */
+var Media=(function(){
+  var _yt=null;
+
+  function initYT(){
+    var iframe=DOM.get('yt-main-iframe')||DOM.query('iframe[src*="youtube"]');
+    if(!iframe)return;
+    if(!iframe.id)iframe.id='yt-v8-frame';
+    if(iframe.src.indexOf('enablejsapi')===-1)
+      iframe.src+=(iframe.src.indexOf('?')!==-1?'&':'?')+'enablejsapi=1';
+
+    function create(){
+      try{
+        _yt=new YT.Player(iframe.id,{
+          events:{
+            onReady:function(){
+              window._ytV8=_yt;
+              if(DISABILITY==='hearing'){
+                setTimeout(function(){try{_yt.playVideo();}catch(e){}},600);
+              }
+            },
+            onStateChange:function(ev){
+              STATE.mediaPlaying=(ev.data===1);
+              if(ev.data===1)STATE.openNoiseWindow();
+              if(ev.data===0){var s=DOM.get('subtitle-box');if(s)s.textContent='Video completed';}
+            }
+          }
+        });
+      }catch(e){}
+    }
+
+    if(window.YT&&window.YT.Player){create();}
+    else{
+      var prev=window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady=function(){
+        if(prev){try{prev();}catch(e){}}create();
+      };
+      if(!DOM.query('script[src*="youtube.com/iframe_api"]')){
+        var tag=document.createElement('script');
+        tag.src='https://www.youtube.com/iframe_api';
+        tag.async=true;
+        document.head.appendChild(tag);
+      }
+    }
+  }
+
+  function _v(){return DOM.get('main-video');}
+  function _a(){return DOM.get('main-audio');}
+  function _y(){return _yt||window._ytV8||null;}
+
+  function play(){
+    STATE.openNoiseWindow();
+    var v=_v();if(v){try{v.play().catch(function(){});}catch(e){}return;}
+    var a=_a();if(a){try{a.play().catch(function(){});}catch(e){}return;}
+    var y=_y();if(y&&typeof y.playVideo==='function'){try{y.playVideo();}catch(e){}}
+  }
+  function pause(){
+    var v=_v();if(v){try{v.pause();}catch(e){}STATE.mediaPlaying=false;return;}
+    var a=_a();if(a){try{a.pause();}catch(e){}STATE.mediaPlaying=false;return;}
+    var y=_y();if(y&&typeof y.pauseVideo==='function'){try{y.pauseVideo();}catch(e){}STATE.mediaPlaying=false;}
+  }
+  function seek(d){
+    var v=_v();if(v){try{v.currentTime=Math.max(0,(v.currentTime||0)+d);}catch(e){}return;}
+    var a=_a();if(a){try{a.currentTime=Math.max(0,(a.currentTime||0)+d);}catch(e){}return;}
+    var y=_y();if(y&&typeof y.getCurrentTime==='function'){
+      try{y.seekTo(Math.max(0,y.getCurrentTime()+d),true);}catch(e){}
+    }
+  }
+  function rate(r){
+    var v=_v();if(v){try{v.playbackRate=r;}catch(e){}return;}
+    var a=_a();if(a){try{a.playbackRate=r;}catch(e){}return;}
+    var y=_y();if(y&&typeof y.setPlaybackRate==='function'){try{y.setPlaybackRate(r);}catch(e){}}
+  }
+  function vol(d){
+    var v=_v();if(v){try{v.volume=Math.min(1,Math.max(0,(v.volume||0.5)+d));}catch(e){}return;}
+    var a=_a();if(a){try{a.volume=Math.min(1,Math.max(0,(a.volume||0.5)+d));}catch(e){}return;}
+    var y=_y();if(y&&typeof y.getVolume==='function'){
+      try{y.setVolume(Math.min(100,Math.max(0,y.getVolume()+(d*100))));}catch(e){}
+    }
+  }
+  function mute(s){
+    var v=_v();if(v){try{v.muted=s;}catch(e){}return;}
+    var a=_a();if(a){try{a.muted=s;}catch(e){}return;}
+    var y=_y();if(y){try{s?y.mute():y.unMute();}catch(e){}}
+  }
+  return{initYT:initYT,play:play,pause:pause,seek:seek,rate:rate,vol:vol,mute:mute};
+})();
+
+/* ── 9. TTS ENGINE (visual only) ── */
+var TTS=(function(){
+  var _rate=1.0,_active=false;
+
+  function _bestVoice(){
+    try{
+      var v=window.speechSynthesis.getVoices();
+      return v.find(function(x){return x.name.indexOf('Samantha')!==-1;})
+          ||v.find(function(x){return x.name.indexOf('Karen')!==-1;})
+          ||v.find(function(x){return x.name.indexOf('Moira')!==-1;})
+          ||v.find(function(x){return x.name.indexOf('Google UK English Female')!==-1;})
+          ||v.find(function(x){return x.name.indexOf('Microsoft Zira')!==-1;})
+          ||v.find(function(x){return x.lang==='en-US';})
+          ||v.find(function(x){return x.lang&&x.lang.indexOf('en')===0;})
+          ||null;
+    }catch(e){return null;}
+  }
+
+  function speak(text,cb){
+    if(DISABILITY!=='visual')return;
+    /* Kill mic FIRST — prevents feedback loop on mobile */
+    VoiceEngine.suspend();
+    STATE.ttsActive=true;
+    try{window.speechSynthesis.cancel();}catch(e){}
+
+    if(!text||!String(text).trim()){
+      STATE.ttsActive=false;_active=false;
+      if(cb){try{cb();}catch(e){}}
+      else{setTimeout(function(){VoiceEngine.resume();},300);}
+      return;
+    }
+
+    _active=true;
+    UI.setStatus('🔊 Speaking…');
+
+    var utt;
+    try{
+      utt=new SpeechSynthesisUtterance(String(text));
+      utt.rate=_rate;utt.pitch=1.0;utt.volume=1.0;utt.lang='en-US';
+    }catch(e){
+      _active=false;STATE.ttsActive=false;
+      if(cb){try{cb();}catch(e2){}}
+      else setTimeout(function(){VoiceEngine.resume();},300);
+      return;
+    }
+
+    var _fired=false;
+    function _done(){
+      if(_fired)return;_fired=true;
+      _active=false;STATE.ttsActive=false;
+      UI.setStatus('');
+      if(cb){try{cb();}catch(e){}}
+      else{
+        /* Mobile needs longer settle before mic restarts */
+        setTimeout(function(){VoiceEngine.resume();},IS_MOBILE?900:600);
+      }
+    }
+    utt.onend=_done;utt.onerror=_done;
+
+    /* Mobile workaround: Chrome mobile sometimes silently drops utterances */
+    var _safety=setTimeout(function(){
+      if(_active&&STATE.ttsActive)_done();
+    },Math.max(3000,text.length*80));
+
+    utt.onend=function(){clearTimeout(_safety);_done();};
+    utt.onerror=function(){clearTimeout(_safety);_done();};
+
+    function go(){
+      try{
+        var voice=_bestVoice();if(voice)utt.voice=voice;
+        window.speechSynthesis.speak(utt);
+      }catch(e){_done();}
+    }
+
+    try{
+      /* Mobile: voices may not be loaded yet */
+      var voices=window.speechSynthesis.getVoices();
+      if(voices&&voices.length>0){go();}
+      else{window.speechSynthesis.addEventListener('voiceschanged',go,{once:true});}
+    }catch(e){go();}
+  }
+
+  function stop(){
+    try{window.speechSynthesis.cancel();}catch(e){}
+    _active=false;STATE.ttsActive=false;
+    UI.setStatus('');
+    setTimeout(function(){VoiceEngine.resume();},300);
+  }
+
+  function setRate(r){
+    _rate=(typeof r==='number'&&isFinite(r))?r:1.0;
+    var lbl=_rate<0.9?'🐢 Slow':_rate>1.1?'⚡ Fast':'▶ Normal';
+    var msg=_rate<0.9?'Speed slow.':_rate>1.1?'Speed fast.':'Speed normal.';
+    UI.setStatus(lbl);speak(msg);
+  }
+
+  function isActive(){return _active;}
+  return{speak:speak,stop:stop,setRate:setRate,isActive:isActive};
+})();
+
+/* ── 10. COMMAND PARSER ── */
+var CMD=(function(){
+  var COOL=2200;
+
+  function _dup(cmd){
+    var now=Date.now();
+    if(cmd===STATE.lastCmd&&now-STATE.lastCmdTime<COOL)return true;
+    STATE.lastCmd=cmd;STATE.lastCmdTime=now;return false;
+  }
+
+  function _fb(msg){
+    if(DISABILITY==='hearing')UI.setBar(msg,false);
+    if(DISABILITY==='visual')UI.bubble(msg);
+  }
+
+  /* Scroll summary/content in subtitle box for hearing students */
+  var _scrollTmr=null;
+  function _scroll(text,prefix){
+    if(_scrollTmr){clearInterval(_scrollTmr);_scrollTmr=null;}
+    var words=String(text||'').split(' ').filter(Boolean);
+    if(!words.length){UI.setSub('(No content available)');return;}
+    var cs=12,ci=0,total=Math.ceil(words.length/cs);
+    UI.setSub((prefix||'')+': '+words.slice(0,cs).join(' '));
+    _scrollTmr=setInterval(function(){
+      ci++;
+      if(ci<total){UI.setSub(words.slice(ci*cs,(ci+1)*cs).join(' '));}
+      else{clearInterval(_scrollTmr);_scrollTmr=null;UI.setSub('✅ Done. Say play to resume.');}
+    },3500);
+  }
+
+  function exec(cmd){
+    if(!cmd||cmd.length<2)return;
+    if(!STATE.canAccept())return;
+    if(_dup(cmd))return;
+
+    /* PLAY */
+    if(/\b(play|resume|continue|unpause)\b/.test(cmd)){
+      Media.play();_fb('▶ Playing');return;
+    }
+    /* PAUSE */
+    if(/\b(pause|stop video|freeze)\b/.test(cmd)){
+      Media.pause();_fb('⏸ Paused');return;
+    }
+    /* STOP TTS */
+    if(/\b(stop|stop reading|stop audio|silence|quiet|enough)\b/.test(cmd)){
+      if(DISABILITY==='visual')TTS.stop();
+      if(_scrollTmr){clearInterval(_scrollTmr);_scrollTmr=null;}
+      _fb('⏹ Stopped');return;
+    }
+    /* REWIND */
+    if(/\b(rewind|backward|back 10|go back)\b/.test(cmd)){
+      Media.seek(-10);_fb('⏪ Rewound 10s');return;
+    }
+    /* FORWARD */
+    if(/\b(forward|skip|ahead)\b/.test(cmd)){
+      Media.seek(10);_fb('⏩ Forward 10s');return;
+    }
+    /* SLOW */
+    if(/\b(slow|slower|slow speed)\b/.test(cmd)){
+      Media.rate(0.75);
+      if(DISABILITY==='visual')TTS.setRate(0.75);
+      else _fb('🐢 Slow speed');return;
+    }
+    /* FAST */
+    if(/\b(fast|faster|quick|speed up)\b/.test(cmd)){
+      Media.rate(1.5);
+      if(DISABILITY==='visual')TTS.setRate(1.35);
+      else _fb('⚡ Fast speed');return;
+    }
+    /* NORMAL */
+    if(/\b(normal|medium|regular)\b/.test(cmd)){
+      Media.rate(1.0);
+      if(DISABILITY==='visual')TTS.setRate(1.0);
+      else _fb('▶ Normal speed');return;
+    }
+    /* VOLUME UP */
+    if(/\b(volume up|louder|loud)\b/.test(cmd)){Media.vol(0.2);_fb('🔊 Volume up');return;}
+    /* VOLUME DOWN */
+    if(/\b(volume down|quieter|quiet|lower)\b/.test(cmd)){Media.vol(-0.2);_fb('🔉 Volume down');return;}
+    /* MUTE */
+    if(/\bmute\b/.test(cmd)){Media.mute(true);_fb('🔇 Muted');return;}
+    /* UNMUTE */
+    if(/\bunmute\b/.test(cmd)){Media.mute(false);_fb('🔊 Unmuted');return;}
+
+    /* READ SUMMARY */
+    if(/\b(summary|read summary|summarize)\b/.test(cmd)){
+      var sum=ITEM.summary||'';
+      if(!sum){
+        var sEl=DOM.get('summary-text');
+        if(sEl){var t=(sEl.textContent||'').trim();if(t.indexOf('Click Summarize')===-1)sum=t;}
+      }
+      if(sum){
+        if(DISABILITY==='hearing'){Media.pause();_scroll(sum,'📋 Summary');}
+        else TTS.speak('Summary. '+sum);
+      }else{
+        if(DISABILITY==='hearing')UI.setSub('No summary available');
+        else TTS.speak('No summary yet. Click Summarize first.');
+      }
+      _fb('📋 Reading summary');return;
+    }
+
+    /* READ CONTENT */
+    if(/\b(read|listen|content|read lesson|read content)\b/.test(cmd)){
+      var ct=ITEM.text||ITEM.transcript||'';
+      if(ct){
+        if(DISABILITY==='hearing')_scroll(ct,'📖 Content');
+        else{UI.setStatus('🔊 Reading…');TTS.speak(ct,function(){UI.setStatus('✅ Done');});}
+      }else{
+        if(DISABILITY==='hearing')UI.setSub('No content available');
+        else TTS.speak('No content available.');
+      }
+      _fb('📖 Reading content');return;
+    }
+
+    /* REPEAT */
+    if(/\b(repeat|again|replay)\b/.test(cmd)){
+      var rep=ITEM.title+'. '+(ITEM.summary||ITEM.text||'').substring(0,300);
+      if(DISABILITY==='visual')TTS.speak(rep);
+      else _scroll(rep,'🔁 Repeat');
+      _fb('🔁 Repeating');return;
+    }
+
+    /* BACK / HOME */
+    if(/\b(back|home|dashboard|return|go home)\b/.test(cmd)){
+      _fb('🏠 Returning…');
+      if(DISABILITY==='visual'){
+        TTS.speak('Returning to dashboard.',function(){
+          try{window.location.href='/student';}catch(e){}
+        });
+      }else{setTimeout(function(){try{window.location.href='/student';}catch(e){}},700);}
+      return;
+    }
+
+    /* SCROLL */
+    if(/\b(scroll down|move down)\b/.test(cmd)){
+      try{window.scrollBy({top:320,behavior:'smooth'});}catch(e){}
+      _fb('⬇ Scrolled down');return;
+    }
+    if(/\b(scroll up|move up)\b/.test(cmd)){
+      try{window.scrollBy({top:-320,behavior:'smooth'});}catch(e){}
+      _fb('⬆ Scrolled up');return;
+    }
+
+    /* LOGOUT */
+    if(/\b(logout|log out|sign out)\b/.test(cmd)){
+      _fb('👋 Logging out');
+      if(DISABILITY==='visual'){
+        TTS.speak('Logging out.',function(){try{window.location.href='/logout';}catch(e){}});
+      }else{setTimeout(function(){try{window.location.href='/logout';}catch(e){}},700);}
+      return;
+    }
+
+    /* HELP */
+    if(/\bhelp\b/.test(cmd)){
+      var h=(LESSON_MODE==='video'||LESSON_MODE==='audio'||LESSON_MODE==='youtube')
+        ?'Commands: play, pause, slow, fast, rewind, forward, volume up, volume down, mute, read summary, back.'
+        :'Commands: read content, read summary, stop, repeat, back.';
+      if(DISABILITY==='visual')TTS.speak(h);
+      else UI.setSub(h);
+      _fb('ℹ️ Help');return;
+    }
+
+    /* UNRECOGNISED */
+    if(DISABILITY==='visual')TTS.speak('Command not recognised. Say help for commands.');
+    else UI.setBar('❓ Say: play, pause, slow, fast, back, read summary',false);
+  }
+
+  return{exec:exec};
+})();
+
+/* ── 11. VOICE ENGINE (single instance, mobile-safe) ── */
+var VoiceEngine=(function(){
+  var SR=(function(){
+    try{return window.SpeechRecognition||window.webkitSpeechRecognition||null;}
+    catch(e){return null;}
+  })();
+
+  var _r=null,_enabled=false,_alive=false,_gen=0;
+  var _restartTmr=null,_watchdog=null,_resultHandled=false;
+
+  function _kill(){
+    clearTimeout(_restartTmr);clearTimeout(_watchdog);
+    _alive=false;_gen++;
+    if(_r){
+      try{_r.onstart=_r.onresult=_r.onerror=_r.onend=null;_r.abort();}catch(e){}
+      _r=null;
+    }
+  }
+
+  function _schedule(ms){
+    clearTimeout(_restartTmr);
+    if(!_enabled)return;
+    _restartTmr=setTimeout(function(){if(!_alive&&_enabled)_launch();},ms||400);
+  }
+
+  function _launch(){
+    if(!_enabled||_alive||STATE.ttsActive)return;
+    if(!SR){
+      if(DISABILITY==='visual')UI.bubble('⚠ Voice needs Chrome browser');
+      return;
+    }
+    _gen++;var myGen=_gen;_resultHandled=false;
+
+    try{
+      _r=new SR();
+      /*
+        Mobile-safe settings:
+        continuous:false  — single-shot most stable on Android Chrome
+        interimResults:false — prevents video narration triggering commands
+        maxAlternatives:5 — balance accuracy vs mobile memory
+        lang:en-IN — handles Indian accent, works on Android
+      */
+      _r.lang='en-IN';
+      _r.continuous=false;
+      _r.interimResults=false;
+      _r.maxAlternatives=5;
+
+      _r.onstart=function(){
+        if(myGen!==_gen)return;
+        _alive=true;STATE.micActive=true;
+        if(DISABILITY==='hearing')UI.setBar('🎙️ Listening…',true);
+        /* Watchdog: mobile Chrome can silently freeze recognition */
+        _watchdog=setTimeout(function(){
+          if(_alive&&myGen===_gen){_kill();_schedule(600);}
+        },IS_MOBILE?7000:9000);
+      };
+
+      _r.onresult=function(event){
+        if(myGen!==_gen)return;
+        clearTimeout(_watchdog);
+        _alive=false;STATE.micActive=false;_resultHandled=true;
+
+        var cmd=NoiseGuard.process(event);
+        if(!cmd){_schedule(IS_MOBILE?500:350);return;}
+
+        /* Show feedback */
+        if(DISABILITY==='visual')UI.bubble('🎙 "'+cmd+'"');
+        if(DISABILITY==='hearing')UI.setBar('✅ Heard: "'+cmd+'"',false);
+
+        CMD.exec(cmd);
+
+        /* For hearing mode: restart immediately after command */
+        /* For visual mode: TTS.speak() calls VoiceEngine.resume() when done */
+        if(DISABILITY==='hearing'){_schedule(IS_MOBILE?1000:800);}
+      };
+
+      _r.onerror=function(ev){
+        if(myGen!==_gen)return;
+        clearTimeout(_watchdog);_alive=false;STATE.micActive=false;
+        var err=(ev&&ev.error)?ev.error:'';
+        if(err==='not-allowed'||err==='service-not-allowed'){
+          _enabled=false;
+          if(DISABILITY==='hearing')UI.setBar('❌ Mic blocked — allow in browser',false);
+          if(DISABILITY==='visual')UI.bubble('❌ Mic blocked — allow in browser settings');
+          return;
+        }
+        /* All other errors: silent restart */
+        _schedule(err==='network'?2500:(IS_MOBILE?700:450));
+      };
+
+      _r.onend=function(){
+        if(myGen!==_gen)return;
+        clearTimeout(_watchdog);_alive=false;STATE.micActive=false;
+        /* Only restart from onend if onresult did NOT already handle it */
+        if(_resultHandled){_resultHandled=false;return;}
+        if(!_enabled||STATE.ttsActive)return;
+        _schedule(IS_MOBILE?600:300);
+      };
+
+      _r.start();
+    }catch(err){_alive=false;_schedule(IS_MOBILE?900:800);}
+  }
+
+  function start(){
+    if(!SR)return;
+    _enabled=true;STATE.suspended=false;
+    _schedule(IS_MOBILE?600:400);
+  }
+
+  function stop(){_enabled=false;STATE.suspended=true;_kill();}
+
+  function suspend(){
+    /* Called before TTS speaks — kill mic so it never hears itself */
+    _kill();
+    if(DISABILITY==='hearing')UI.setBar('🔊 Speaking…',false);
+  }
+
+  function resume(){
+    /* Called after TTS ends */
+    if(!_enabled||STATE.suspended)return;
+    _schedule(IS_MOBILE?900:550);
+  }
+
+  return{start:start,stop:stop,suspend:suspend,resume:resume};
+})();
+
+/* ── 12. SUBTITLE ENGINE ── */
+var Subtitles=(function(){
+  function _parse(trans){
+    var lines=[];
+    if(!trans)return lines;
+    trans.split('\n').forEach(function(line){
+      try{
+        var m=line.match(/\[(\d+):(\d+)\](.*)/);
+        if(m)lines.push({
+          time:parseInt(m[1],10)*60+parseInt(m[2],10),
+          text:(m[3]||'').trim()
+        });
+      }catch(e){}
+    });
+    return lines;
+  }
+
+  function _words(trans){
+    if(!trans)return[];
+    return trans.replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+  }
+
+  function _getActive(lines,t){
+    for(var i=0;i<lines.length;i++){
+      if(t>=lines[i].time&&(!lines[i+1]||t<lines[i+1].time))return lines[i].text;
+    }return'';
+  }
+
+  function wireLocal(){
+    var box=DOM.get('subtitle-box');
+    var trans=ITEM.transcript||ITEM.text||'';
+    if(!box)return;
+    var attempts=0;
+    function poll(){
+      var vid=DOM.get('main-video');
+      if(!vid){attempts++;if(attempts<30)setTimeout(poll,150);return;}
+      var lines=_parse(trans);
+      var words=(!lines.length&&trans)?_words(trans):[];
+      if(!lines.length&&!words.length){box.textContent='(No transcript)';return;}
+
+      vid.addEventListener('timeupdate',function(){
+        try{
+          var t=Math.floor(vid.currentTime||0);
+          if(lines.length){box.textContent=_getActive(lines,t)||'…';}
+          else if(words.length){
+            var dur=vid.duration||1,prog=t/dur;
+            var idx=Math.floor(prog*words.length);
+            box.textContent=words.slice(idx,idx+15).join(' ')||'…';
+          }
+        }catch(e){}
+      });
+      vid.addEventListener('play',function(){STATE.mediaPlaying=true;STATE.openNoiseWindow();});
+      vid.addEventListener('pause',function(){STATE.mediaPlaying=false;});
+      vid.addEventListener('ended',function(){STATE.mediaPlaying=false;box.textContent='Video completed';});
+    }
+    poll();
+  }
+
+  function wireYT(){
+    var box=DOM.get('subtitle-box');
+    var trans=ITEM.transcript||ITEM.text||'';
+    if(!box)return;
+    var lines=_parse(trans);
+    var words=(!lines.length&&trans)?_words(trans):[];
+    var tmr=null;
+
+    function startSync(player){
+      if(tmr)clearInterval(tmr);
+      tmr=setInterval(function(){
+        try{
+          if(!player||typeof player.getCurrentTime!=='function')return;
+          var t=Math.floor(player.getCurrentTime()||0);
+          if(lines.length){box.textContent=_getActive(lines,t)||'…';}
+          else if(words.length){
+            var dur=(player.getDuration&&player.getDuration())||1,prog=t/dur;
+            var idx=Math.floor(prog*words.length);
+            box.textContent=words.slice(idx,idx+15).join(' ')||'…';
+          }
+        }catch(e){}
+      },500);
+    }
+
+    var w=0;
+    function waitPlayer(){
+      var p=window._ytV8;
+      if(p&&typeof p.getCurrentTime==='function'){startSync(p);return;}
+      w++;if(w<40)setTimeout(waitPlayer,600);
+    }
+    setTimeout(waitPlayer,1500);
+  }
+
+  return{wireLocal:wireLocal,wireYT:wireYT};
+})();
+
+/* ── 13. PAGE INIT ── */
+function _initPage(){
+  try{document.title=(ITEM.title||'Lesson')+' – EduLearn';}catch(e){}
+  DOM.text('item-title',ITEM.title||'Untitled');
+  DOM.text('item-teacher','By '+(ITEM.teacher||'Unknown'));
+
+  var badge=DOM.get('item-type-badge');
+  if(badge){badge.textContent=ITEM.type||'';if(ITEM.type)badge.classList.add('badge-'+ITEM.type);}
+
+  DOM.text('main-text',ITEM.text||'No text content available.');
+
+  if(DISABILITY==='hearing'){
+    DOM.show('hearing-notice');
+    var sb=DOM.get('subtitle-box');
+    if(sb){sb.style.display='block';sb.textContent='▶ Loading…';}
+  }
+
+  if(DISABILITY==='hearing'||DISABILITY==='visual'){
+    DOM.show('summary-card');
+    if(ITEM.summary)DOM.text('summary-text',ITEM.summary);
+  }
+  if(DISABILITY==='visual'){
+    DOM.show('read-summary-btn','inline-block');
+    DOM.show('audio-download-card');
+  }
+  if(DISABILITY==='both'){
+    DOM.text('braille-text',ITEM.braille||'⠝⠕ ⠃⠗⠁⠊⠇⠇⠑');
+    DOM.show('braille-card');DOM.show('braille-cell-card');
+    _renderBrailleCell(ITEM.braille);
+  }
+
+  if(DISABILITY==='hearing'&&ITEM.sign_video){
+    var sv=DOM.get('sign-video-el');
+    if(sv)sv.innerHTML='<source src="/uploads/'+ITEM.sign_video+'">';
+    DOM.show('sign-video-card');
+  }
+  if(DISABILITY==='hearing'){var sf=DOM.get('sign-fab');if(sf)sf.style.display='flex';}
+
+  _renderFile();
+
+  /* HEARING MODE */
+  if(DISABILITY==='hearing'){
+    if(LESSON_MODE==='video')setTimeout(Subtitles.wireLocal,150);
+    if(LESSON_MODE==='youtube'){Media.initYT();setTimeout(Subtitles.wireYT,400);}
+    if(LESSON_MODE==='audio'){
+      setTimeout(function(){
+        var a=DOM.get('main-audio');
+        if(a){
+          a.addEventListener('play',function(){STATE.mediaPlaying=true;STATE.openNoiseWindow();});
+          a.addEventListener('pause',function(){STATE.mediaPlaying=false;});
+        }
+      },500);
+    }
+    /* Hearing students: voice commands available but NO mic auto-start */
+    /* They can use the blue bottom bar commands */
+    setTimeout(function(){UI.hint();},800);
+    /* NOTE: VoiceEngine does NOT start for hearing — they use visual cues */
+  }
+
+  /* VISUAL MODE — auto-start voice after page ready */
+  if(DISABILITY==='visual'){
+    if(LESSON_MODE==='youtube')Media.initYT();
+
+    /* Mobile requires a user gesture before TTS works.
+       We use the page load event + small delay.
+       On mobile: if TTS fails silently, VoiceEngine still starts. */
+    var _started=false;
+    function _startVoice(){
+      if(_started)return;_started=true;
+      var hasMedia=(LESSON_MODE==='video'||LESSON_MODE==='audio'||LESSON_MODE==='youtube');
+      var intro=hasMedia
+        ?'Lesson opened. '+ITEM.title+
+          '. Say Play to start video. Say Pause to pause. '+
+          'Say Read Summary or Back to return.'
+        :'Lesson opened. '+ITEM.title+
+          '. Say Read Content to hear lesson. '+
+          'Say Read Summary or Back to return.';
+
+      /* Safety: even if TTS fails on mobile, start VoiceEngine anyway */
+      var _voiceStarted=false;
+      function _ensureVoice(){
+        if(!_voiceStarted){_voiceStarted=true;VoiceEngine.start();UI.hint();}
+      }
+
+      TTS.speak(intro,function(){_ensureVoice();});
+      /* Fallback: if TTS never fires callback within 8s, start voice anyway */
+      setTimeout(_ensureVoice, IS_MOBILE?8000:6000);
+    }
+
+   function mobileStartHandler() {
+
+  document.removeEventListener(
+    'touchstart',
+    mobileStartHandler
+  );
+
+  document.removeEventListener(
+    'click',
+    mobileStartHandler
+  );
+
+  setTimeout(function () {
+
+    _startVoice();
+
+  }, 400);
+
+}
+
+/* MOBILE */
+if (IS_MOBILE) {
+
+  document.addEventListener(
+    'touchstart',
+    mobileStartHandler,
+    { once:true }
+  );
+
+  document.addEventListener(
+    'click',
+    mobileStartHandler,
+    { once:true }
+  );
+
+}
+
+/* DESKTOP */
+else {
+
+  if (document.readyState === 'complete') {
+
+    setTimeout(_startVoice,700);
+
+  } else {
+
+    window.addEventListener(
+      'load',
+      function () {
+
+        setTimeout(_startVoice,700);
+
+      }
+    );
+
+  }
+
+}
+  }
+}
+
+/* DOM-ready guard */
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',_initPage);
+}else{_initPage();}
+
+/* ── 14. FILE RENDERING ── */
+function _renderFile(){
+  var area=DOM.get('file-area');
+  if(!area||!ITEM.file)return;
+  var f=ITEM.file.toLowerCase();
+
+  try{
+    if(f.match(/\.(mp4|avi|mov)$/)){
+      var vid=document.createElement('video');
+      vid.id='main-video';vid.controls=true;
+      vid.style.cssText='width:100%;border-radius:8px;background:#000;margin-top:.5rem';
+      vid.setAttribute('playsinline','');/* Required for iOS */
+      vid.innerHTML='<source src="/uploads/'+ITEM.file+'">';
+
+      if(DISABILITY==='visual'){
+        var _ann=false;
+        vid.addEventListener('play',function(){
+          STATE.mediaPlaying=true;STATE.openNoiseWindow();
+          TTS.speak(_ann?'Video playing.':'Playing video. '+ITEM.title);_ann=true;
+        });
+        vid.addEventListener('pause',function(){STATE.mediaPlaying=false;TTS.speak('Video paused.');});
+        vid.addEventListener('ended',function(){
+          STATE.mediaPlaying=false;
+          TTS.speak('Video ended. Say Back to return to lessons.');
+        });
+      }
+      if(DISABILITY==='hearing'){
+        vid.addEventListener('play',function(){STATE.mediaPlaying=true;STATE.openNoiseWindow();});
+        vid.addEventListener('pause',function(){STATE.mediaPlaying=false;});
+      }
+      area.appendChild(vid);
+
+      if(DISABILITY==='hearing'){
+        setTimeout(function(){
+          var v=DOM.get('main-video');
+          if(v){var p=v.play();if(p&&p.catch)p.catch(function(){});}
+        },900);
+      }
+
+    }else if(f.match(/\.(mp3|wav)$/)){
+      var aud=document.createElement('audio');
+      aud.id='main-audio';aud.controls=true;
+      aud.style.cssText='width:100%;margin-top:.5rem';
+      aud.innerHTML='<source src="/uploads/'+ITEM.file+'">';
+      if(DISABILITY==='hearing'){
+        aud.addEventListener('play',function(){STATE.mediaPlaying=true;STATE.openNoiseWindow();});
+        aud.addEventListener('pause',function(){STATE.mediaPlaying=false;});
+        setTimeout(function(){
+          var a=DOM.get('main-audio');
+          if(a){var p=a.play();if(p&&p.catch)p.catch(function(){});}
+        },900);
+      }
+      area.appendChild(aud);
+
+    }else if(f.match(/\.pdf$/)){
+      var frm=document.createElement('iframe');
+      frm.src='/uploads/'+ITEM.file;
+      frm.style.cssText='width:100%;height:500px;border:none;border-radius:8px';
+      area.appendChild(frm);
+
+    }else{
+      area.innerHTML='<a href="/uploads/'+ITEM.file+
+        '" class="btn btn-outline" target="_blank">📎 Download / View File</a>';
+    }
+  }catch(e){
+    try{area.innerHTML='<p style="color:#c62828">Could not render file.</p>';}catch(e2){}
+  }
+}
+
+/* ── 15. PUBLIC BUTTON FUNCTIONS ── */
+function speakText(text,onEnd){TTS.speak(text,onEnd);}
+function stopSpeech(){TTS.stop();}
+function setTTSStatus(msg){UI.setStatus(msg);}
+function toggleVoiceCommand(){}/* no-op — VoiceEngine manages all */
+
+function readContent(){
+  UI.setStatus('🔊 Reading…');
+  TTS.speak(ITEM.text||ITEM.transcript||'No content.',function(){UI.setStatus('✅ Done');});
+}
+
+function readSummary(){
+  var sEl=DOM.get('summary-text');
+  var stxt=sEl?(sEl.textContent||'').trim():'';
+  if(stxt&&stxt.indexOf('Click Summarize')===-1)TTS.speak('Summary. '+stxt);
+  else if(ITEM.summary)TTS.speak('Summary. '+ITEM.summary);
+  else TTS.speak('No summary yet. Click Summarize first.');
+}
+
+function setSpeed(rate,label){
+  speechRate=rate;
+  DOM.queryAll('.speed-btn').forEach(function(b){b.classList.remove('active');});
+  DOM.addClass('spd-'+label,'active');
+  TTS.setRate(rate);
+}
+
+function readLesson(){
+  try{
+    var text=[ITEM.title,ITEM.summary,ITEM.transcript].filter(Boolean).join('. ').substring(0,3000);
+    if(!text)return;
+    var audio=new Audio('/tts?text='+encodeURIComponent(text));
+    audio.play().catch(function(){});window.currentAudio=audio;
+  }catch(e){}
+}
+
+function stopLessonAudio(){
+  try{if(window.currentAudio){window.currentAudio.pause();window.currentAudio.currentTime=0;}}catch(e){}
+}
+
+/* ── SUMMARIZE ── */
+async function generateSummary(){
+  var sEl=DOM.get('summary-status'),tEl=DOM.get('summary-text');if(!tEl)return;
+  if(ITEM.summary){tEl.textContent=ITEM.summary;if(sEl)sEl.textContent='✅ Loaded';return;}
+  if(sEl)sEl.textContent='⏳ Generating…';
+  try{
+    var res=await fetch('/api/summarize',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:ITEM.text||ITEM.transcript||''})
+    });
+    var data=await res.json();
+    if(data&&data.summary){tEl.innerHTML=data.summary;if(sEl)sEl.textContent='✅ Done';}
+    else{if(sEl)sEl.textContent='❌ Failed';}
+  }catch(e){if(sEl)sEl.textContent='❌ Error';}
+}
+
+/* ── GENERATE AUDIO ── */
+async function generateAudio(btn,rate){
+  if(!btn)return;var orig=btn.textContent;
+  try{
+    btn.textContent='⏳ Generating…';btn.disabled=true;
+    var text=(ITEM.text||ITEM.transcript||'').substring(0,2000);
+    if(!text){btn.textContent=orig;btn.disabled=false;return;}
+    var url='/tts?text='+encodeURIComponent(text);
+    var wrap=DOM.get('audio-wrap');
+    if(wrap)wrap.innerHTML='<audio controls src="'+url+'" style="width:100%;margin-top:.4rem"></audio>'+
+      '<a href="'+url+'" download class="btn btn-outline" style="margin-top:.5rem;display:inline-block">⬇ Download MP3</a>';
+  }catch(e){}
+  btn.textContent=orig;btn.disabled=false;
+}
+
+/* ── SIGN PLAYER ── */
+function toggleSignPlayer(){
+  var p=DOM.get('sign-player');if(!p)return;
+  if(p.style.display==='block'){
+    var f=DOM.get('sign-iframe');if(f)f.src='';p.style.display='none';
+  }else{
+    p.style.display='block';
+    var f2=DOM.get('sign-iframe');
+    if(f2)f2.src='https://www.youtube.com/embed/videoseries?list=PLMN7QCuj6dfaUwmtdkdKhINGZzyGwp7Q1&autoplay=1';
+  }
+}
+
+/* ── BRAILLE / ESP32 ── */
+async function sendToESP32(){
+  var s=DOM.get('esp32-status');if(s)s.textContent='📡 Sending…';
+  try{
+    await fetch('/api/braille',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:(ITEM.text||'').substring(0,200)})});
+    if(s)s.textContent='✅ Braille ready.';
+  }catch(e){if(s)s.textContent='⚠ ESP32 not connected.';}
+}
+
+async function convertCustom(){
+  var text='';try{text=prompt('Enter text for Braille:')||'';}catch(e){}
+  if(!text.trim())return;
+  try{
+    var res=await fetch('/api/braille',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:text})});
+    var data=await res.json();
+    if(data&&data.braille){DOM.text('braille-text',data.braille);_renderBrailleCell(data.braille);}
+  }catch(e){}
+}
+
+function _renderBrailleCell(braille){
+  var c=DOM.get('braille-cell');if(!c)return;c.innerHTML='';
+  try{
+    String(braille||'').substring(0,8).split('').forEach(function(ch){
+      var code=ch.codePointAt(0);
+      if(code<0x2800||code>0x28FF)return;
+      var off=code-0x2800,cell=document.createElement('div');
+      cell.style.cssText='display:inline-grid;grid-template-columns:1fr 1fr;gap:5px;margin:4px 6px;padding:8px;background:#2a2a2a;border-radius:6px;border:1px solid #555';
+      [0,1,2,3,4,5].forEach(function(bit){
+        var dot=document.createElement('div'),active=(off>>bit)&1;
+        dot.style.cssText='width:18px;height:18px;border-radius:50%;background:'+(active?'#42a5f5':'#333')+
+          ';border:2px solid '+(active?'#1565c0':'#555')+';display:grid;place-items:center;font-size:.55rem;color:#fff';
+        dot.textContent=active?'●':'○';dot.title='Dot '+(bit+1)+': '+(active?'HIGH':'LOW');
+        cell.appendChild(dot);
+      });
+      c.appendChild(cell);
+    });
+  }catch(e){}
+}
+function renderBrailleCell(b){_renderBrailleCell(b);}
+</script>
+</body>
+</html>

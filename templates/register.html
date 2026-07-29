@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Register – EduLearn</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>.reg-wrap{max-width:420px;margin:3rem auto;}</style>
+</head>
+<body>
+<nav>
+  <span class="brand">📚 EduLearn</span>
+  <a href="/login">Login</a>
+</nav>
+<div class="page reg-wrap">
+  <h1>Create Account</h1>
+  <div class="card">
+    <form method="POST">
+      <label>Full Name</label>
+      <input name="name" required placeholder="Your name">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="your@email.com">
+      <label>Password</label>
+      <input type="password" name="password" required placeholder="password">
+      <label>Role</label>
+      <select name="role" id="roleSelect" onchange="toggleDisability()">
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+      </select>
+      <div id="disabilityField">
+        <label>Disability Type</label>
+        <select name="disability">
+          <option value="hearing">Hearing Impaired</option>
+          <option value="visual">Visually Impaired</option>
+          <option value="both">Both (Deafblind)</option>
+        </select>
+      </div>
+      <button class="btn btn-green mt" style="width:100%" type="submit">Register & Continue</button>
+    </form>
+  </div>
+  <p class="muted" style="text-align:center;margin-top:.7rem">Already have an account? <a href="/login" style="color:#1a237e">Login</a></p>
+</div>
+<script>
+function toggleDisability(){
+  document.getElementById('disabilityField').style.display =
+    document.getElementById('roleSelect').value === 'teacher' ? 'none' : 'block';
+}
+window.onload = toggleDisability;
+</script>
+</body>
+</html>
